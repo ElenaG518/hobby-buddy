@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 mongoose.Promise = global.Promise;
 
@@ -39,6 +40,14 @@ UserSchema.methods.serialize = function() {
     avatar: this.avatar,
     date: this.date
   };
+};
+
+UserSchema.methods.validatePassword = function(password) {
+  return bcrypt.compare(password, this.password);
+};
+
+UserSchema.statics.hashPassword = function(password) {
+  return bcrypt.hash(password, 10);
 };
 
 module.exports = User = mongoose.model('User', UserSchema);
