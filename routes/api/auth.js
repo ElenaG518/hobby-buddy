@@ -1,21 +1,34 @@
+'use strict';
 const express = require('express');
 const router = express.Router();
-const auth = require('../../middleware/auth');
-const bcrypt = require('bcryptjs');
+const passport = require('passport');
+// const auth = require('../../middleware/auth');
+// const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const config = require('config');
-const { check, validationResult } = require('express-validator/check');
 
 const User = require('../../models/User');
+
+const createAuthToken = function(user) {
+  // jwt.sign(payload, secretOrPrivateKey, [options, callback])
+  return jwt.sign({ user }, config.get('jwtSecret'), {
+    subject: user.name,
+    expiresIn: '7d',
+    algorithm: 'HS256'
+  });
+};
+
+const localAuth = passport.authenticate('local', { session: false });
 
 // @route    GET api/auth
 // @desc     Test route
 // @access   Public
 
-router.get('/', auth, async (req, res) => {
+router.get('/', localAuth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
     res.json(user.serialize());
+    // res.send('GET auth');
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Internal Server Error');
@@ -26,60 +39,10 @@ router.get('/', auth, async (req, res) => {
 // @desc     Authenticate user & get token
 // @access   Public
 
-router.post(
-  '/',
-  [
-    check('username', 'Please enter your username').exists(),
-    check('password', 'Please enter your password').exists()
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const { username, password } = req.body;
-
-    try {
-      // See if user exists
-      let user = await User.findOne({ username });
-      console.log(user);
-
-      if (!user) {
-        return res
-          .status(400)
-          .json({ errors: [{ msg: 'Invalid credentials' }] });
-      }
-
-      const isMatch = await bcrypt.compare(password, user.password);
-
-      if (!isMatch) {
-        return res
-          .status(400)
-          .json({ errors: [{ msg: 'Invalid credentials' }] });
-      }
-
-      const payload = {
-        user: {
-          id: user.id
-        }
-      };
-
-      // Return jsonwebtoken
-      jwt.sign(
-        payload,
-        config.get('jwtSecret'),
-        { expiresIn: 360000 },
-        (err, token) => {
-          if (err) throw err;
-          res.json({ token });
-        }
-      );
-    } catch (err) {
-      console.error(err.message);
-      res.status(500).send('Internal server error');
-    }
-  }
-);
+router.post('/', localAuth, async (req, res) => {
+  console.log('req.user from login in auth ', req.user);
+  const authToken = createAuthToken(req.user.serialize());
+  res.json({ authToken });
+});
 
 module.exports = router;
