@@ -1,16 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../../middleware/auth');
+const passport = require('passport');
 const { check, validationResult } = require('express-validator/check');
 
 const Profile = require('../../models/Profile');
 const User = require('../../models/User');
 
+const jwtAuth = passport.authenticate('jwt', { session: false });
+
 // @route    GET api/profile/me
 // @desc     Get current users profile
 // @access   Private
 
-router.get('/me', auth, async (req, res) => {
+router.get('/me', jwtAuth, async (req, res) => {
   try {
     const profile = await Profile.findOne({ user: req.user.id }).populate(
       'user',
@@ -35,7 +37,7 @@ router.get('/me', auth, async (req, res) => {
 router.post(
   '/',
   [
-    auth,
+    jwtAuth,
     [
       check('bio', 'Bio field is required')
         .not()
@@ -159,13 +161,31 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// @route    PUT api/profile/experience
-// @desc     Add profile experience
+// @route    DELETE api/profile
+// @desc     Delete profile, user & posts
+// @access   Private
+
+router.delete('/', jwtAuth, async (req, res) => {
+  try {
+    // @todo - remove user's posts
+
+    await Profile.findOneAndRemove({ user: req.user.id });
+    await User.findOneAndRemove({ _id: req.user.id });
+
+    res.json({ msg: 'User deleted' });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+// @route    PUT api/profile/blogpost
+// @desc     Add profile blogpost
 // @access   Private
 router.put(
   '/blogpost',
   [
-    auth,
+    jwtAuth,
     [
       check('title', 'Please enter the title of your post')
         .not()
@@ -223,18 +243,24 @@ router.put(
   }
 );
 
-// @route    DELETE api/profile
-// @desc     Delete profile, user & posts
+// @route    DELETE api/profile/blogpost/:blog_id
+// @desc     Delete blogpost entry from profile
 // @access   Private
 
-router.delete('/', auth, async (req, res) => {
+router.delete('/blogpost/:blog_id', jwtAuth, async (req, res) => {
   try {
-    // @todo - remove user's posts
+    // get profile that has the blog we want to delete
+    const profile = await Profile.findOne({ user: req.user.id });
 
-    await Profile.findOneAndRemove({ user: req.user.id });
-    await User.findOneAndRemove({ _id: req.user.id });
+    const blogIndex = profile.blogpost
+      .map(blog => blog.id)
+      .indexOf(req.params.blog_id);
 
-    res.json({ msg: 'User deleted' });
+    profile.blogpost.splice(blogIndex, 1);
+
+    await profile.save();
+
+    res.json(profile);
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Internal Server Error');
