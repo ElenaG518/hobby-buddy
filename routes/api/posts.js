@@ -64,4 +64,57 @@ router.get('/', jwtAuth, async (req, res) => {
   }
 });
 
+// @route    GET api/posts/:id
+// @desc     Get post by ID
+// @access   Private
+
+router.get('/:id', jwtAuth, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+
+    if (!post) {
+      console.log('no post found');
+      return res.status(404).json({ msg: 'Post not found' });
+    }
+    res.json(post);
+  } catch (err) {
+    console.error(err.message);
+    if (err.kind === 'ObjectId') {
+      return res.status(404).json({ msg: 'Post not found' });
+    }
+    return res.status(500).send('Internal Server Error');
+  }
+});
+
+// @route    DELETE api/posts/:id
+// @desc     Delete post by ID
+// @access   Private
+
+router.delete('/:id', jwtAuth, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+
+    if (!post) {
+      console.log('no post found');
+      return res.status(404).json({ msg: 'Post not found' });
+    }
+    console.log(post.user, req.user.id);
+    // ensure only owner of post can delete post
+    // need to convert the ObjectId to a string in order to do comparison
+    if (post.user.toString() !== req.user.id) {
+      return res.status(400).json({ msg: 'Not authorized' });
+    }
+
+    await post.remove();
+    res.json({ msg: 'Post deletion was successful' });
+  } catch (err) {
+    console.error(err.message);
+    if (err.kind === 'ObjectId') {
+      // if the post is not found
+      return res.status(404).json({ msg: 'Post not found' });
+    }
+    return res.status(500).send('Internal Server Error');
+  }
+});
+
 module.exports = router;
