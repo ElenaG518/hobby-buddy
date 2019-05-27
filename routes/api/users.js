@@ -1,22 +1,24 @@
 const express = require('express');
 const router = express.Router();
 const gravatar = require('gravatar');
-const bcrypt = require('bcryptjs');
+
 const jwt = require('jsonwebtoken');
 const config = require('config');
 const { check, validationResult } = require('express-validator/check');
 
 const User = require('../../models/User');
 
-// @route    POST api/users
-// @desc     Register user
-// @access   Public
-
+// router.get('/', (req, res) => {
+//   res.send('Users route');
+// });
 router.get('/', async (req, res) => {
   let users = await User.find();
   res.json({ users });
 });
 
+// @route    POST api/users
+// @desc     Register user
+// @access   Public
 router.post(
   '/',
   [
@@ -82,26 +84,10 @@ router.post(
         password
       });
       // Encrypt password
-      user.password = await bcrypt.hash(password, 10);
+      user.password = await User.hashPassword(password);
       // Save user to the database.  This will return a promise that will return the user that was just created, plus the user id.
       await user.save();
-
-      const payload = {
-        user: {
-          id: user.id
-        }
-      };
-
-      // Return jsonwebtoken
-      jwt.sign(
-        payload,
-        config.get('jwtSecret'),
-        { expiresIn: 360000 },
-        (err, token) => {
-          if (err) throw err;
-          res.json({ token });
-        }
-      );
+      res.json({ user });
     } catch (err) {
       console.error(err.message);
       res.status(500).send('Internal server error');
